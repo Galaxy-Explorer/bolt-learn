@@ -62,6 +62,8 @@ func main() {
 	//fmt.Println(bucketHeaderSize, leafPageElementSize)
 	//var value = make([]byte, 100)
 	//fmt.Println(value)
-	fmt.Println(4 & 1)
+	a := [5]int{1, 2, 3, 4, 5}
+	b := a[3:]
+	fmt.Println(b[0])
 
 }

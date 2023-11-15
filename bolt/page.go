@@ -27,12 +27,13 @@ const (
 
 type pgid uint64
 
+// pageHeader，简写为PH，占用的大小为16字节（8+2+2+4），boltdb上所有的数据写入到文件上，都是按照页来写入的。
 type page struct {
-	id       pgid
-	flags    uint16
-	count    uint16
-	overflow uint32
-	ptr      uintptr
+	id       pgid      // 物理上page的id
+	flags    uint16    // 页的类型，（1，分支页类型，2，叶子页类型，4，元数据页，16，空闲链表页泪习惯）
+	count    uint16    // 该页上有多少个元素，以叶子节点为例，只要计算leafHeader的个数就可以
+	overflow uint32    // 数据是否在该页已经装不下了，这个时候就需要多个页来承载这些个节点数据，TODO:个人觉得overflow是记录了溢出了多少个页，这些页的pgid是连续的，所以很容易找到溢出的页；
+	ptr      uintptr   // 底层的leafElement，branchElement是一个列表，ptr指向的就是这个列表的指针，这样就能够找到数组的起始位置，来根据位移定位数据
 }
 
 // typ returns a human readable page type string used for debugging.
@@ -94,10 +95,11 @@ func (s pages) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
 func (s pages) Less(i, j int) bool { return s[i].id < s[j].id }
 
 // branchPageElement represents a node on a branch page.
+// branchHeader，占用的大小为16B（4+4+8）可以简写为BH
 type branchPageElement struct {
-	pos   uint32
-	ksize uint32
-	pgid  pgid
+	pos   uint32 // 占用4个字节，位移，占用4个字节，通过pos，能够找到改key；
+	ksize uint32 // 占用4个字节，pos的位移可以找到改key起始位置，[pos:ksize] 就是该key的大小
+	pgid  pgid   // 物理存储上，存储的是通过unsafe.pointer后的指针的值
 }
 
 // key returns a byte slice of the node key.
@@ -107,11 +109,12 @@ func (n *branchPageElement) key() []byte {
 }
 
 // leafPageElement represents a node on a leaf page.
+// leafHeader，占用的大小为16B（4+4+4+4），可以简写为LH
 type leafPageElement struct {
-	flags uint32
-	pos   uint32
-	ksize uint32
-	vsize uint32
+	flags uint32 // 占用4个字节，叶子类型，flag为0，则是叶子节点，flag为1，则是bucket；
+	pos   uint32 // 占用4个字节，位移，占用4个字节，通过pos，能够找到改key；
+	ksize uint32 // 占用4个字节，pos的位移可以找到改key起始位置，[pos:ksize] 就是该key的大小
+	vsize uint32 // 占用4个字节，如果flag为0，value就是真实的值，如果flag为1，存储的内容是内联的bucket，[pos + ksize:vsize],就是该value的大小
 }
 
 // key returns a byte slice of the node key.

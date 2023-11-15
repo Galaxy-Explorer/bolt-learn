@@ -158,19 +158,26 @@ func (n *node) del(key []byte) {
 }
 
 // read initializes the node from a page.
+// 把page的内容初始化到一个node当中
 func (n *node) read(p *page) {
+	// 给这个node的pageid赋值
 	n.pgid = p.id
+	// 根据page的类型来判读啊是否是叶子节点，还是分支节点
 	n.isLeaf = ((p.flags & leafPageFlag) != 0)
+	// inodes是node中真正存储key，value的地方，根据这个page.count, 新建一个数组
 	n.inodes = make(inodes, int(p.count))
 
+	// 通过循环的方式，把p当中的值赋值到inode中
 	for i := 0; i < int(p.count); i++ {
 		inode := &n.inodes[i]
 		if n.isLeaf {
+			// 返回的是叶子节点的header，再根据这个header，找到相关的key，value来给inode赋值
 			elem := p.leafPageElement(uint16(i))
 			inode.flags = elem.flags
 			inode.key = elem.key()
 			inode.value = elem.value()
 		} else {
+			// 返回的是分支节点的header，再根据这个header，找到相关的key，value来给inode赋值
 			elem := p.branchPageElement(uint16(i))
 			inode.pgid = elem.pgid
 			inode.key = elem.key()
@@ -179,6 +186,7 @@ func (n *node) read(p *page) {
 	}
 
 	// Save first key so we can find the node in the parent when we spill.
+	// 在node中存储，inodes第一个key，TODO：为了分裂使用，后面在看
 	if len(n.inodes) > 0 {
 		n.key = n.inodes[0].key
 		_assert(len(n.key) > 0, "read: zero-length node key")
@@ -188,33 +196,44 @@ func (n *node) read(p *page) {
 }
 
 // write writes the items onto one or more pages.
+// 把一个node的值，写入到page当中，有可能是一个多多个page，TODO:有可能inodes中的一些inode的key，value过大，导致一个page放不下
+// TODO 这个page是空么？
 func (n *node) write(p *page) {
 	// Initialize page.
+	// 判断要写入的page的类型是leaf，还是branch
 	if n.isLeaf {
 		p.flags |= leafPageFlag
 	} else {
 		p.flags |= branchPageFlag
 	}
 
+	// 如果inodes里的个数超过65536个，panic
 	if len(n.inodes) >= 0xFFFF {
 		panic(fmt.Sprintf("inode overflow: %d (pgid=%d)", len(n.inodes), p.id))
 	}
+	// 记录一下这个page要存储多少个(key, value)
 	p.count = uint16(len(n.inodes))
 
 	// Stop here if there are no items to write.
+	// 如果为0，那么相当于node里没有任何元素，不需要往page里面写数据
 	if p.count == 0 {
 		return
 	}
 
 	// Loop over each item and write it to the page.
-	//
+	// b这个[maxAllocSize]byte 类型数组的指针，该指针的位置指向了n.pageElementSize()*len(n.inodes)这个位置，也就是真实数据(key, value)的位置；
+	// TODO b是个切片类型，指向的位置是切片的末尾
 	b := (*[maxAllocSize]byte)(unsafe.Pointer(&p.ptr))[n.pageElementSize()*len(n.inodes):]
 	for i, item := range n.inodes {
+		// 判断key是否为空，如果为空，panic
 		_assert(len(item.key) > 0, "write: zero-length inode key")
 
 		// Write the page element.
 		if n.isLeaf {
+			// 获取到这个LH的指针地址，写入的leafElement这个LH中的内容
 			elem := p.leafPageElement(uint16(i))
+			// 计算出这个LH的pos的点, TODO 这个page应该已经把各个LH初始化了好，只不过LH里面的值都为空
+			// 根据uintptr(unsafe.Pointer(&b[0])) - uintptr(unsafe.Pointer(elem)) 得到每个elem的位移
 			elem.pos = uint32(uintptr(unsafe.Pointer(&b[0])) - uintptr(unsafe.Pointer(elem)))
 			elem.flags = item.flags
 			elem.ksize = uint32(len(item.key))
@@ -223,7 +242,9 @@ func (n *node) write(p *page) {
 			elem := p.branchPageElement(uint16(i))
 			elem.pos = uint32(uintptr(unsafe.Pointer(&b[0])) - uintptr(unsafe.Pointer(elem)))
 			elem.ksize = uint32(len(item.key))
+			// 如果是分支节点，还需要把inode当中指向的page写入到elem当中
 			elem.pgid = item.pgid
+			// 这块要求写入node写入的page必须要和分配的page是同一个page
 			_assert(elem.pgid != p.id, "write: circular dependency occurred")
 		}
 
@@ -231,6 +252,7 @@ func (n *node) write(p *page) {
 		// then we need to reallocate the byte array pointer.
 		//
 		// See: https://github.com/boltdb/bolt/pull/335
+		// 从这个commit来看，能看出来为啥会有 maxAllocSize 这个东东
 		klen, vlen := len(item.key), len(item.value)
 		if len(b) < klen+vlen {
 			b = (*[maxAllocSize]byte)(unsafe.Pointer(&b[0]))[:]
