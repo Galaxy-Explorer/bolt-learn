@@ -16,11 +16,12 @@ type node struct {
     key        []byte
     pgid       pgid
     parent     *node
-    children   nodes
-    inodes     inodes
+    children   nodes  // 存储的是孩子节点的数据，叶子结点，分支节点
+    inodes     inodes // 存储的是本节点的数据，叶子节点，分支节点
 }
 
 // root returns the top-level node this node is attached to.
+// 这个比较简单，递归找到node的根节点
 func (n *node) root() *node {
     if n.parent == nil {
         return n
@@ -29,6 +30,7 @@ func (n *node) root() *node {
 }
 
 // minKeys returns the minimum number of inodes this node should have.
+
 func (n *node) minKeys() int {
     if n.isLeaf {
         return 1
@@ -70,6 +72,7 @@ func (n *node) pageElementSize() int {
 }
 
 // childAt returns the child node at a given index.
+// 从bucket中找该子节点，如果bucket缓存了该node，就直接返回，如果没有就需要从page中读取
 func (n *node) childAt(index int) *node {
     if n.isLeaf {
         panic(fmt.Sprintf("invalid childAt(%d) on a leaf node", index))
@@ -78,17 +81,20 @@ func (n *node) childAt(index int) *node {
 }
 
 // childIndex returns the index of a given child node.
+// 返回node字节点的索引，二分查找法
 func (n *node) childIndex(child *node) int {
     index := sort.Search(len(n.inodes), func(i int) bool { return bytes.Compare(n.inodes[i].key, child.key) != -1 })
     return index
 }
 
 // numChildren returns the number of children.
+// 计算一个node中字节点的个数
 func (n *node) numChildren() int {
     return len(n.inodes)
 }
 
 // nextSibling returns the next node with the same parent.
+// 返回当前node的下一个节点，TODO，如果下一个节点和该节点不在同一个page，所以要通过parent来去找，是这个意思么？
 func (n *node) nextSibling() *node {
     if n.parent == nil {
         return nil
@@ -101,6 +107,7 @@ func (n *node) nextSibling() *node {
 }
 
 // prevSibling returns the previous node with the same parent.
+// 同上
 func (n *node) prevSibling() *node {
     if n.parent == nil {
         return nil
@@ -256,9 +263,11 @@ func (n *node) write(p *page) {
         //
         // See: https://github.com/boltdb/bolt/pull/335
         // 从这个commit来看，能看出来为啥会有 maxAllocSize 这个东东
-        // TODO 如果一个key + value太大，就重新分配一个数组来专门放这个key value？
+        // 这块相当于把slice扩展了一下，增加了长度么
         klen, vlen := len(item.key), len(item.value)
-        // TODO 这里的b看上去没有使用，不知道是不是又是通过指针引用的方式，写入了p.ptr指向的位置，这块怎么体现出来，node写入了多个page呢
+        if len(b) < klen+vlen {
+            b = (*[maxAllocSize]byte)(unsafe.Pointer(&b[0]))[:]
+        }
 
         if len(b) < klen+vlen {
             // TODO 这块的长度已经写不下了，在实际的时候，会变成多个page？

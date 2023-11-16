@@ -33,6 +33,7 @@ const (
 const DefaultFillPercent = 0.5
 
 // Bucket represents a collection of key/value pairs inside the database.
+// TODO: bucket相当于通过map缓存了所有的数据，包括subbucket, b+树的实现，是不是是在node层面实现的
 type Bucket struct {
 	*bucket
 	tx       *Tx                // the associated transaction
@@ -645,6 +646,7 @@ func (b *Bucket) rebalance() {
 }
 
 // node creates a node from a page and associates it with a given parent.
+// 查找一个node，如果在缓存中，就直接返回，如果不在，就新建一个node，从page中读取，在填充在这个新建的node中
 func (b *Bucket) node(pgid pgid, parent *node) *node {
 	_assert(b.nodes != nil, "nodes map expected")
 
@@ -662,6 +664,8 @@ func (b *Bucket) node(pgid pgid, parent *node) *node {
 	}
 
 	// Use the inline page if this is an inline bucket.
+	// TODO 不是很懂
+	// TODO 如果是内联bucket，那么数据一定在内联bucket里，如果不是内联page，那么数据在别的地方？
 	var p = b.page
 	if p == nil {
 		p = b.tx.page(pgid)

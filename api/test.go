@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"sync"
 	"unsafe"
 )
@@ -18,7 +17,16 @@ func (c *Counter) Value() int {
 	return c.count
 }
 
+type page struct {
+	id       pgid      // 物理上page的id
+	flags    uint16    // 页的类型，（1，分支页类型，2，叶子页类型，4，元数据页，16，空闲链表页泪习惯）
+	count    uint16    // 该页上有多少个元素，以叶子节点为例，只要计算leafHeader的个数就可以
+	overflow uint32    // 数据是否在该页已经装不下了，这个时候就需要多个页来承载这些个节点数据，TODO:个人觉得overflow是记录了溢出了多少个页，这些页的pgid是连续的，所以很容易找到溢出的页；
+	ptr      uintptr   // 底层的leafElement，branchElement是一个列表，ptr指向的就是这个列表的指针，这样就能够找到数组的起始位置，来根据位移定位数据
+}
+
 const bucketHeaderSize = int(unsafe.Sizeof(bucket{}))
+const pageHeaderSize = int(unsafe.Offsetof(((*page)(nil)).ptr))
 
 type bucket struct {
 	root     pgid   // page id of the bucket's root-level page
@@ -62,8 +70,4 @@ func main() {
 	//fmt.Println(bucketHeaderSize, leafPageElementSize)
 	//var value = make([]byte, 100)
 	//fmt.Println(value)
-	a := [5]int{1, 2, 3, 4, 5}
-	b := a[3:]
-	fmt.Println(b[0])
-
 }
