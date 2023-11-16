@@ -974,7 +974,7 @@ type meta struct {
 	flags    uint32
 	root     bucket
 	freelist pgid
-	pgid     pgid
+	pgid     pgid // 下一次分配的pgid
 	txid     txid
 	checksum uint64
 }
