@@ -13,29 +13,10 @@ func main() {
 	defer db.Close()
 
 	_ = db.Update(func(tx *bolt.Tx) error {
-		tx.CreateBucketIfNotExists([]byte("bucket1"))
-		tx.CreateBucketIfNotExists([]byte("bucket2"))
-		tx.CreateBucketIfNotExists([]byte("bucket3"))
-		tx.CreateBucketIfNotExists([]byte("bucket4"))
-		tx.CreateBucketIfNotExists([]byte("bucket5"))
-		tx.CreateBucketIfNotExists([]byte("bucket6"))
-		tx.CreateBucketIfNotExists([]byte("bucket7"))
-		tx.CreateBucketIfNotExists([]byte("bucket8"))
-		tx.CreateBucketIfNotExists([]byte("bucket9"))
-		tx.CreateBucketIfNotExists([]byte("bucket10"))
-		tx.CreateBucketIfNotExists([]byte("bucket11"))
-		tx.CreateBucketIfNotExists([]byte("bucket12"))
-		tx.CreateBucketIfNotExists([]byte("bucket13"))
-		tx.CreateBucketIfNotExists([]byte("bucket14"))
-		tx.CreateBucketIfNotExists([]byte("bucket15"))
-		tx.CreateBucketIfNotExists([]byte("bucket16"))
-		tx.CreateBucketIfNotExists([]byte("bucket17"))
-		tx.CreateBucketIfNotExists([]byte("bucket18"))
-		tx.CreateBucketIfNotExists([]byte("bucket20"))
-		tx.CreateBucketIfNotExists([]byte("bucket21"))
-		tx.CreateBucketIfNotExists([]byte("bucket22"))
-		//_, err := tx.CreateBucketIfNotExists([]byte("bucket1"))
-		//return err
-		return nil
+		b1, _ := tx.CreateBucketIfNotExists([]byte("bucket1"))
+		b11, _ := b1.CreateBucketIfNotExists([]byte("bucket11"))
+		b11.Put([]byte("k11"), []byte("v11"))
+		//fmt.Printf("-----------%+v", b11)
+		return err
 	})
 }

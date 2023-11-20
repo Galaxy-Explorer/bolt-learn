@@ -34,6 +34,10 @@ const DefaultFillPercent = 0.5
 
 // Bucket represents a collection of key/value pairs inside the database.
 // TODO: bucket相当于通过map缓存了所有的数据，包括subbucket, b+树的实现，是不是是在node层面实现的
+// buckets 存放了所有存储的子bucket的实现
+// nodes 存放了所有存储的node的实现
+// rootNode 指向的是根node，这个根node应该就是bucket在内存中的东西吧。
+// *bucket实际是真正的bucket信息
 type Bucket struct {
 	*bucket
 	tx       *Tx                // the associated transaction
@@ -122,6 +126,12 @@ func (b *Bucket) Bucket(name []byte) *Bucket {
 	if b.buckets != nil {
 		b.buckets[string(name)] = child
 	}
+	if child.page != nil {
+		fmt.Printf("--------------%+v\n",child)
+		fmt.Printf("--------------%+v\n",child.page.count)
+		elem := child.page.leafPageElement(uint16(0))
+		fmt.Println(string(elem.key()), string(elem.value()))
+	}
 
 	return child
 }
@@ -152,6 +162,7 @@ func (b *Bucket) openBucket(value []byte) *Bucket {
 	if child.root == 0 {
 		child.page = (*page)(unsafe.Pointer(&value[bucketHeaderSize]))
 	}
+	fmt.Printf("child:%+v\n", child.page)
 
 	return &child
 }
@@ -195,11 +206,6 @@ func (b *Bucket) CreateBucket(key []byte) (*Bucket, error) {
 	// Since subbuckets are not allowed on inline buckets, we need to
 	// dereference the inline page, if it exists. This will cause the bucket
 	// to be treated as a regular, non-inline bucket for the rest of the tx.
-	//fmt.Println("-------------b.page", b.page)
-	//fmt.Println("-------------b.buckets", b.buckets)
-	//fmt.Println("-------------b.rootNode", b.rootNode)
-	//fmt.Println("-------------b.root", b.root)
-	fmt.Println("-------------b.nodes", b.nodes)
 	b.page = nil
 
 	return b.Bucket(key), nil
