@@ -377,6 +377,7 @@ func (c *Cursor) node() *node {
 }
 
 // elemRef represents a reference to an element on a given page/node.
+// 因为数据不是在内存node中，就是在page中，所以这两个值一定会有一个为null
 type elemRef struct {
 	page  *page
 	node  *node

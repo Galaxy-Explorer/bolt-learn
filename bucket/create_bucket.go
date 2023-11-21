@@ -16,7 +16,6 @@ func main() {
 		b1, _ := tx.CreateBucketIfNotExists([]byte("bucket1"))
 		b11, _ := b1.CreateBucketIfNotExists([]byte("bucket11"))
 		b11.Put([]byte("k11"), []byte("v11"))
-		//fmt.Printf("-----------%+v", b11)
 		return err
 	})
 }

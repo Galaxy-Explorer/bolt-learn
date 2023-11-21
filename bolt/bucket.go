@@ -37,6 +37,7 @@ const DefaultFillPercent = 0.5
 // buckets 存放了所有存储的子bucket的实现
 // nodes 存放了所有存储的node的实现
 // rootNode 指向的是根node，这个根node应该就是bucket在内存中的东西吧。
+// 内联page，该数据是放在了leafNode
 // *bucket实际是真正的bucket信息
 type Bucket struct {
 	*bucket
@@ -106,6 +107,7 @@ func (b *Bucket) Cursor() *Cursor {
 // Returns nil if the bucket does not exist.
 // The bucket instance is only valid for the lifetime of the transaction.
 func (b *Bucket) Bucket(name []byte) *Bucket {
+	// 如果该subBucket被缓存了，直接返回
 	if b.buckets != nil {
 		if child := b.buckets[string(name)]; child != nil {
 			return child
@@ -113,24 +115,33 @@ func (b *Bucket) Bucket(name []byte) *Bucket {
 	}
 
 	// Move cursor to key.
+	// 新建了一个游标，该游标是一个结构体，存储了bucket的信息，以及node与page的关联的栈，elemRef
 	c := b.Cursor()
 	k, v, flags := c.seek(name)
 
 	// Return nil if the key doesn't exist or it is not a bucket.
+	// 找不到该bucket，或者找到了name一样的，但是flag不同，返回nil
 	if !bytes.Equal(name, k) || (flags&bucketLeafFlag) == 0 {
 		return nil
 	}
 
 	// Otherwise create a bucket and cache it.
+	// 创建一个bucket，并cache到buckets中
 	var child = b.openBucket(v)
 	if b.buckets != nil {
 		b.buckets[string(name)] = child
 	}
+	// 从这块可以看出内联page是会存储数据的
 	if child.page != nil {
-		fmt.Printf("--------------%+v\n",child)
-		fmt.Printf("--------------%+v\n",child.page.count)
-		elem := child.page.leafPageElement(uint16(0))
-		fmt.Println(string(elem.key()), string(elem.value()))
+	//	fmt.Printf("bucket--------------%+v\n",b)
+	//	fmt.Printf("b.bucket.root--------------%+v\n",b.bucket.root)
+	//	fmt.Printf("b.buckets[\"bucket11\"]--------------%+v\n",b.buckets["bucket11"])
+	//	fmt.Printf("child--------------%+v\n",child)
+	//	fmt.Println("b.page, b.bucket.root", child.page.id, child.bucket.root)
+	//	fmt.Printf("child.page.count--------------%+v\n",child.page.count)
+	//	fmt.Printf("child.page.count--------------%+v\n",child.page)
+	//	elem := child.page.leafPageElement(uint16(0))
+	//	fmt.Println(string(elem.key()), string(elem.value()))
 	}
 
 	return child
@@ -139,10 +150,13 @@ func (b *Bucket) Bucket(name []byte) *Bucket {
 // Helper method that re-interprets a sub-bucket value
 // from a parent into a Bucket
 func (b *Bucket) openBucket(value []byte) *Bucket {
+	// 新建了一个bucket，关联到这个事务上，切记Bucket是一个内存对象，既然是内存当中的对象，就和事务相关
 	var child = newBucket(b.tx)
+
 
 	// If unaligned load/stores are broken on this arch and value is
 	// unaligned simply clone to an aligned byte array.
+	// 只有在bolt_arm上才会进行key的深度copy，该值基本为false，可以不怎么去管他
 	unaligned := brokenUnaligned && uintptr(unsafe.Pointer(&value[0]))&3 != 0
 
 	if unaligned {
@@ -152,17 +166,19 @@ func (b *Bucket) openBucket(value []byte) *Bucket {
 	// If this is a writable transaction then we need to copy the bucket entry.
 	// Read-only transactions can point directly at the mmap entry.
 	if b.tx.writable && !unaligned {
+		// 写入的时候需要新建bucket，因为都是指针，需要通过取值的方式赋值给child.bucket
 		child.bucket = &bucket{}
 		*child.bucket = *(*bucket)(unsafe.Pointer(&value[0]))
 	} else {
+		// 读取，只需要把该值返回即可，不涉及写入，所以不需要指针
 		child.bucket = (*bucket)(unsafe.Pointer(&value[0]))
 	}
 
 	// Save a reference to the inline page if the bucket is inline.
+	// 新建的bucket都属于内联bucket，TODO：child.root =0,这块的注释没看懂
 	if child.root == 0 {
 		child.page = (*page)(unsafe.Pointer(&value[bucketHeaderSize]))
 	}
-	fmt.Printf("child:%+v\n", child.page)
 
 	return &child
 }
@@ -549,7 +565,6 @@ func (b *Bucket) spill() error {
 			if err := child.spill(); err != nil {
 				return err
 			}
-
 			// Update the child bucket header in this bucket.
 			value = make([]byte, unsafe.Sizeof(bucket{}))
 			var bucket = (*bucket)(unsafe.Pointer(&value[0]))
@@ -599,6 +614,7 @@ func (b *Bucket) inlineable() bool {
 	var n = b.rootNode
 
 	// Bucket must only contain a single leaf node.
+	fmt.Printf("inlineable-n111-%+v\n", n)
 	if n == nil || !n.isLeaf {
 		return false
 	}
@@ -615,6 +631,7 @@ func (b *Bucket) inlineable() bool {
 			return false
 		}
 	}
+	fmt.Println("look this")
 
 	return true
 }

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"sync"
 	"unsafe"
 )
@@ -28,10 +29,6 @@ type page struct {
 const bucketHeaderSize = int(unsafe.Sizeof(bucket{}))
 const pageHeaderSize = int(unsafe.Offsetof(((*page)(nil)).ptr))
 
-type bucket struct {
-	root     pgid   // page id of the bucket's root-level page
-	sequence uint64 // monotonically incrementing, used by NextSequence()
-}
 
 type leafPageElement struct {
 	flags uint32
@@ -41,6 +38,20 @@ type leafPageElement struct {
 }
 
 type pgid uint64
+
+type Cursor struct {
+	bucket *Bucket
+}
+type Bucket struct {
+	*bucket
+	name string
+}
+
+type bucket struct {
+	root     pgid   // page id of the bucket's root-level page
+	sequence uint64 // monotonically incrementing, used by NextSequence()
+}
+
 
 func main() {
 
@@ -70,4 +81,7 @@ func main() {
 	//fmt.Println(bucketHeaderSize, leafPageElementSize)
 	//var value = make([]byte, 100)
 	//fmt.Println(value)
+	t := &Cursor{ &Bucket{}}
+	t.bucket.name = "test"
+	fmt.Printf("%+v\n", t.bucket)
 }
