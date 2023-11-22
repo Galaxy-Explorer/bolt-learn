@@ -161,12 +161,13 @@ func (n *node) del(key []byte) {
     n.inodes = append(n.inodes[:index], n.inodes[index+1:]...)
 
     // Mark the node as needing rebalancing.
+    // 只要删除key，就会涉及到合并
     n.unbalanced = true
 }
 
 // read initializes the node from a page.
 // 把page的内容初始化到一个node当中
-// TODO 万一一个 k, v 一个page放不下呢
+// TODO 万一一个k, v 一个page放不下呢，从MaxKeySize，MaxValueSize，应该一个page是可以放下的吧。
 func (n *node) read(p *page) {
     // 给这个node的pageid赋值
     n.pgid = p.id

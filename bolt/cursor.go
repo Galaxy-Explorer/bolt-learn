@@ -28,6 +28,7 @@ func (c *Cursor) Bucket() *Bucket {
 // First moves the cursor to the first item in the bucket and returns its key and value.
 // If the bucket is empty then a nil key and value are returned.
 // The returned key and value are only valid for the life of the transaction.
+// 这一段，比较好理解，就是通过bucket的root节点，一直往下找最左边的节点，如果是bucket就返回(k, nil),如果是真实数据，就返回（k，v）
 func (c *Cursor) First() (key []byte, value []byte) {
 	_assert(c.bucket.tx.db != nil, "tx closed")
 	c.stack = c.stack[:0]
@@ -52,6 +53,7 @@ func (c *Cursor) First() (key []byte, value []byte) {
 // Last moves the cursor to the last item in the bucket and returns its key and value.
 // If the bucket is empty then a nil key and value are returned.
 // The returned key and value are only valid for the life of the transaction.
+// 同First，不涉及递归
 func (c *Cursor) Last() (key []byte, value []byte) {
 	_assert(c.bucket.tx.db != nil, "tx closed")
 	c.stack = c.stack[:0]
@@ -70,6 +72,8 @@ func (c *Cursor) Last() (key []byte, value []byte) {
 // Next moves the cursor to the next item in the bucket and returns its key and value.
 // If the cursor is at the end of the bucket then a nil key and value are returned.
 // The returned key and value are only valid for the life of the transaction.
+// TODO 从这块来看的话，next方法，只是去查找一个node或者page当中的下一个元素?
+// 再此我们从当前位置查找前一个或者下一个时，需要注意一个问题，如果当前节点中元素已经完了，那么此时需要回退到遍历路径的上一个节点。然后再继续查找，下面进行代码分析。
 func (c *Cursor) Next() (key []byte, value []byte) {
 	_assert(c.bucket.tx.db != nil, "tx closed")
 	k, v, flags := c.next()
@@ -82,6 +86,8 @@ func (c *Cursor) Next() (key []byte, value []byte) {
 // Prev moves the cursor to the previous item in the bucket and returns its key and value.
 // If the cursor is at the beginning of the bucket then a nil key and value are returned.
 // The returned key and value are only valid for the life of the transaction.
+// TODO 从这块来看的话，Prev方法，只是去查找一个node或者page当中的前一个元素?
+// 再此我们从当前位置查找前一个或者下一个时，需要注意一个问题，如果当前节点中元素已经完了，那么此时需要回退到遍历路径的上一个节点。然后再继续查找，下面进行代码分析。
 func (c *Cursor) Prev() (key []byte, value []byte) {
 	_assert(c.bucket.tx.db != nil, "tx closed")
 
@@ -118,6 +124,9 @@ func (c *Cursor) Seek(seek []byte) (key []byte, value []byte) {
 	k, v, flags := c.seek(seek)
 
 	// If we ended up after the last element of a page then move to the next one.
+	// 为啥要key不存在的情况下，会返回刚好比这个key大一点的下一个key？是因为这个seek方法做的尽量的通用，不仅是Get操作可以使用，
+	// insert，update和delete操作都通过seek方法来定位要操作的位置。Cursor还支持prefix scan操作，在遍历过程中这个next key可以用来做终止条件判断。
+	// TODO: 有可能其他方法在调用该方法的时候，还是会做等值判断
 	if ref := &c.stack[len(c.stack)-1]; ref.index >= ref.count() {
 		k, v, flags = c.next()
 	}
@@ -259,15 +268,19 @@ func (c *Cursor) search(key []byte, pgid pgid) {
 	c.stack = append(c.stack, e)
 
 	// If we're on a leaf page/node then find the specific node.
+	// 该节点是叶子节点，如果找到该值就返回
 	if e.isLeaf() {
 		c.nsearch(key)
 		return
 	}
 
 	if n != nil {
+		// stack存储了该路径，这个节点找不到，stack的位置会变，然后去下一个node中查找，一直查找到叶子节点
 		c.searchNode(key, n)
 		return
 	}
+
+	// 如果都找不到，就去page中查找，因为elem中node和page是只能有一个有值的，TODO:先不仔细研究逻辑，大概的思想能看懂
 	c.searchPage(key, p)
 }
 
@@ -315,6 +328,7 @@ func (c *Cursor) searchPage(key []byte, p *page) {
 }
 
 // nsearch searches the leaf node on the top of the stack for a key.
+// 在叶子节点中找值，这块就算是到树的最底层了
 func (c *Cursor) nsearch(key []byte) {
 	e := &c.stack[len(c.stack)-1]
 	p, n := e.page, e.node
@@ -355,6 +369,7 @@ func (c *Cursor) keyValue() ([]byte, []byte, uint32) {
 }
 
 // node returns the node that the cursor is currently positioned on.
+// 返回cursor所在的node的位置
 func (c *Cursor) node() *node {
 	_assert(len(c.stack) > 0, "accessing a node with a zero-length cursor stack")
 

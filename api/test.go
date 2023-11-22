@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"sync"
 	"unsafe"
 )
@@ -52,36 +51,40 @@ type bucket struct {
 	sequence uint64 // monotonically incrementing, used by NextSequence()
 }
 
+//pool := sync.Pool{
+//	New: func() interface{} {
+//		return &Counter{}
+//	},
+//}
+//counter := &Counter{}
+//
+//for i := 0; i < 10; i++ {
+//	go func(pool sync.Pool, i int) {
+//		counter = pool.Get().(*Counter)
+//		fmt.Printf("i = %d, before %d ", i, counter.Value())
+//		counter.Add(i)
+//		fmt.Printf("after %d\n", counter.Value())
+//		pool.Put(counter)
+//	}(pool, i)
+//}
+//
+//
+//time.Sleep(1 * time.Second)
+//fmt.Println(counter.Value())
+
+//const bucketHeaderSize = int(unsafe.Sizeof(bucket{}))
+//const leafPageElementSize = int(unsafe.Sizeof(leafPageElement{}))
+//fmt.Println(bucketHeaderSize, leafPageElementSize)
+//var value = make([]byte, 100)
+//fmt.Println(value)
+//t := &Cursor{ &Bucket{}}
+//t.bucket.name = "test"
+//fmt.Printf("%+v\n", t.bucket)
+//
 
 func main() {
-
-	//pool := sync.Pool{
-	//	New: func() interface{} {
-	//		return &Counter{}
-	//	},
-	//}
-	//counter := &Counter{}
-	//
-	//for i := 0; i < 10; i++ {
-	//	go func(pool sync.Pool, i int) {
-	//		counter = pool.Get().(*Counter)
-	//		fmt.Printf("i = %d, before %d ", i, counter.Value())
-	//		counter.Add(i)
-	//		fmt.Printf("after %d\n", counter.Value())
-	//		pool.Put(counter)
-	//	}(pool, i)
-	//}
-	//
-	//
-	//time.Sleep(1 * time.Second)
-	//fmt.Println(counter.Value())
-
-	//const bucketHeaderSize = int(unsafe.Sizeof(bucket{}))
-	//const leafPageElementSize = int(unsafe.Sizeof(leafPageElement{}))
-	//fmt.Println(bucketHeaderSize, leafPageElementSize)
-	//var value = make([]byte, 100)
-	//fmt.Println(value)
-	t := &Cursor{ &Bucket{}}
-	t.bucket.name = "test"
-	fmt.Printf("%+v\n", t.bucket)
+	c := make(chan int ,5)
+	for i := 0; i < 10; i++ {
+		c <- i
+	}
 }

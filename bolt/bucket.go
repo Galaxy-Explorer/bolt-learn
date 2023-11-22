@@ -105,7 +105,7 @@ func (b *Bucket) Cursor() *Cursor {
 
 // Bucket retrieves a nested bucket by name.
 // Returns nil if the bucket does not exist.
-// The bucket instance is only valid for the lifetime of the transaction.
+// The bucket instance is only valid for the lifetime of the transaction. 这个注释挺重要，bucket仅存在于内存当中
 func (b *Bucket) Bucket(name []byte) *Bucket {
 	// 如果该subBucket被缓存了，直接返回
 	if b.buckets != nil {
@@ -450,6 +450,7 @@ func (b *Bucket) Stats() BucketStats {
 				used += int(lastElement.pos + lastElement.ksize + lastElement.vsize)
 			}
 
+			// 从这也可以看出，内联bucket的root为0
 			if b.root == 0 {
 				// For inlined bucket just update the inline stats
 				s.InlineBucketInuse += used
@@ -648,11 +649,14 @@ func (b *Bucket) write() []byte {
 	var value = make([]byte, bucketHeaderSize+n.size())
 
 	// Write a bucket header.
+	// 搞成这样，主要是要把value值，传递给page
 	var bucket = (*bucket)(unsafe.Pointer(&value[0]))
 	*bucket = *b.bucket
 
 	// Convert byte slice to a fake page and write the root node.
+	// 初始化好这个page
 	var p = (*page)(unsafe.Pointer(&value[bucketHeaderSize]))
+	// 把node值写入page
 	n.write(p)
 
 	return value
