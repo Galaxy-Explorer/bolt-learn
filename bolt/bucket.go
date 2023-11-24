@@ -687,11 +687,11 @@ func (b *Bucket) node(pgid pgid, parent *node) *node {
 	if parent == nil {
 		b.rootNode = n
 	} else {
+		// TODO:这块为啥是追加，children不是有序的么,是像作者说的那样，在内存中，不满足b+树的特性，只是在commit时候，再去分裂，合并，排序？
 		parent.children = append(parent.children, n)
 	}
 
 	// Use the inline page if this is an inline bucket.
-	// TODO 不是很懂
 	// TODO 如果是内联bucket，那么数据一定在内联bucket里，如果不是内联page，那么数据在别的地方？
 	var p = b.page
 	if p == nil {
