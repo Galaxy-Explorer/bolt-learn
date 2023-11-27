@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"sync"
 	"unsafe"
 )
@@ -84,21 +83,4 @@ type bucket struct {
 //
 
 func main() {
-	var ch = make(chan int, 10)
-	ch <- 1
-	ch <- 2
-	ch <- 3
-	ch <- 4
-	r1, err := <- ch
-	fmt.Println(r1, err)
-	r1, err = <- ch
-	fmt.Println(r1, err)
-	r1, err = <- ch
-	fmt.Println(r1, err)
-	r1, err = <- ch
-	fmt.Println(r1, err)
-	close(ch)
-	r1, err = <- ch
-	fmt.Println(r1, err)
 }
-
